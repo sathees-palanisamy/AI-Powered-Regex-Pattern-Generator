@@ -2,7 +2,7 @@ The issue is likely with the formatting when copying. Here's a clean version wit
 
 # AI Powered Regex Pattern Generator
 
-A full-stack application that generates regex patterns from natural language descriptions and sample patterns using Google's Gemini AI. Built with React (Vite) frontend and Node.js/Express backend.
+A full-stack application that generates regex patterns from natural language descriptions and sample patterns using Google's Gemini AI. Built with React (Vite) frontend and Node.js/Express backend
 
 ## Features
 
