@@ -2,12 +2,12 @@
   "name": "langgraph-regex-backend",
   "type": "module",
   "version": "1.0.0",
-  "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "server": "nodemon server.js",
+    "serverGraph": "nodemon servergraph.js",
+    "serverChain": "nodemon serverChain.js",
     "client": "cd ./client && npm run dev",
-    "dev": "concurrently \"npm run server\" \"npm run client\""
+    "graph": "concurrently \"npm run serverGraph\" \"npm run client\"",
+    "chain": "concurrently \"npm run serverChain\" \"npm run client\""
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

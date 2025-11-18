@@ -1,9 +1,8 @@
-// server.js - Add this at the very top
-require('dotenv').config();
+import "dotenv/config";
+import express from "express";
+import compiledGraph from "./graph/regexGraph.js";
 
-const express = require("express");
 const app = express();
-const regexGraph = require("./graph/regexGraph");
 
 app.use(express.json());
 
@@ -18,44 +17,85 @@ app.post("/generate-pattern", async (req, res) => {
       });
     }
 
-    console.log('Received request:', { description, samples });
+    if (!Array.isArray(samples)) {
+      return res.status(400).json({ 
+        error: "Samples must be an array" 
+      });
+    }
+
+    console.log('📥 Received request:', { 
+      description: description.substring(0, 100), 
+      sampleCount: samples.length 
+    });
 
     // Use the invoke method on the compiled graph
-    const result = await regexGraph.invoke({
+    const result = await compiledGraph.invoke({
       description: description || "",
       samples: samples || [],
       rulesJson: "",
       resultJson: ""
     });
 
-    console.log('Graph result:', result);
+    console.log('✅ Graph execution completed');
+    console.log('📊 Rules JSON length:', result.rulesJson?.length);
+    console.log('📊 Result JSON length:', result.resultJson?.length);
 
+    // Parse the results using our cleaner
     let rules = [];
     let output = {};
+    
     try { 
-      rules = JSON.parse(result.rulesJson); 
+      if (result.rulesJson) {
+        const cleanedRules = result.rulesJson.replace(/```json\s*/g, '').replace(/\s*```/g, '').trim();
+        const parsedRules = JSON.parse(cleanedRules);
+        rules = parsedRules.rules || parsedRules;
+        console.log('✅ Rules parsed successfully:', rules.length, 'rules');
+      }
     } catch (e) {
-      console.error('Error parsing rulesJson:', e);
+      console.error('❌ Error parsing rulesJson:', e.message);
+      console.log('📝 Raw rulesJson:', result.rulesJson);
     }
+    
     try { 
-      output = JSON.parse(result.resultJson); 
+      if (result.resultJson) {
+        const cleanedResult = result.resultJson.replace(/```json\s*/g, '').replace(/\s*```/g, '').trim();
+        output = JSON.parse(cleanedResult);
+        console.log('✅ Output parsed successfully');
+      }
     } catch (e) {
-      console.error('Error parsing resultJson:', e);
+      console.error('❌ Error parsing resultJson:', e.message);
+      console.log('📝 Raw resultJson:', result.resultJson);
+    }
+
+    // Check for errors
+    if (output.error === "REDOS detected" || (rules && rules.error === "REDOS detected")) {
+      return res.status(400).json({ 
+        error: "Security risk detected: Pattern complexity could cause performance issues",
+        code: "REDOS_DETECTED"
+      });
+    }
+
+    if (!output.pattern) {
+      return res.status(500).json({ 
+        error: "Failed to generate pattern",
+        details: output.error || "Unknown error during pattern generation"
+      });
     }
 
     res.json({ 
       success: true,
-      rules: rules.rules || rules,
-      output 
+      rules: Array.isArray(rules) ? rules : [],
+      output
     });
 
   } catch (err) {
-    console.error('Server error:', err);
+    console.error('💥 Server error:', err);
     res.status(500).json({ 
-      error: err.message,
-      details: "Check console for more information" 
+      error: "Internal server error",
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 });
 
-app.listen(3000, () => console.log("API running on port 3000"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 API running on port ${PORT}`));

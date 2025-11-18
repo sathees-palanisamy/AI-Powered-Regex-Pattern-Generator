@@ -1,9 +1,14 @@
-const { Annotation } = require("@langchain/langgraph");
-const { z } = require("zod");
+// graph/state.js
+import { Annotation } from "@langchain/langgraph";
+import { z } from "zod";
 
-module.exports = Annotation.Root({
-  description: z.string(),
-  samples: z.array(z.any()),
-  rulesJson: z.string(),
-  resultJson: z.string()
-});
+// Define the state schema
+export const stateDefinition = {
+  description: z.string().describe("User description of the regex pattern"),
+  samples: z.array(z.string()).describe("Sample patterns for analysis"),
+  rulesJson: z.string().describe("JSON string of extracted rules"),
+  resultJson: z.string().describe("JSON string of final regex pattern result")
+};
+
+// Create annotation
+export const StateAnnotation = Annotation.Root(stateDefinition);

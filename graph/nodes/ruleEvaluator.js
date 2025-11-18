@@ -1,43 +1,89 @@
-const { ChatGoogleGenerativeAI } = require("@langchain/google-genai");
+// graph/nodes/ruleEvaluator.js
+import { gemini } from "../../utils/geminiClient.js";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
-const model = new ChatGoogleGenerativeAI({
-  model: "gemini-2.5-flash",
-  temperature: 0,
-  apiKey: process.env.GOOGLE_API_KEY,
-  apiVersion: "v1beta",
-  baseUrl: "https://generativelanguage.googleapis.com",
-  authMode: "api-key" 
-});
+// Helper function to clean JSON response
+function cleanJsonResponse(text) {
+  if (!text) return text;
+  
+  // Remove markdown code blocks
+  let cleaned = text.replace(/```json\s*/g, '')
+                   .replace(/\s*```/g, '')
+                   .trim();
+  
+  // Remove any other non-JSON prefixes/suffixes
+  cleaned = cleaned.replace(/^[^{[]*/, '')
+                   .replace(/[^}\]]*$/, '')
+                   .trim();
+  
+  return cleaned;
+}
 
-module.exports = async (state) => {
-  const prompt = `
-You are a Rule Evaluator.
+export async function ruleEvaluator(state) {
+  const { description, samples } = state;
+  
+  const systemPrompt = `You are a SECURE Rule Evaluator.
 
-Extract strict rules from the description and samples.
-Return JSON only:
+Your job:
+1. Analyze the description and the provided sample patterns.
+2. Detect whether ANY of the inferred rules or possible regex patterns would require unsafe or REDOS-vulnerable structures.
+
+A REDOS risk exists if ANY of the following would be needed:
+- Nested quantifiers (e.g., (a+)+, (.*)+, (.+)+)
+- Unbounded dot-star or plus-star patterns (e.g., .*, .+, (.*){m,})
+- Catastrophic backtracking structures (e.g., (ab|a)+, (.*a.*)*, ambiguous overlapping alternations)
+- Repetitive groups over ambiguous tokens
+- Backtracking-heavy alternations with repetition
+
+If ANY risk is detected:
+Return EXACTLY the following JSON:
+{
+  "error": "REDOS detected"
+}
+
+Otherwise, extract the strict structural rules that the samples follow.
+The rules must describe the fixed structure, not a regex. (Example: "Starts with 2 letters", "Ends with 1 digit".)
+
+Return JSON ONLY in this format:
 {
   "rules": [
+    { "rule": "..." },
     { "rule": "..." }
   ]
-}`;
+}
 
-  console.log('state.description:', state.description);
-  console.log('state.samples:', state.samples);
+IMPORTANT: Return PURE JSON only. No markdown code blocks, no explanations, no additional text.
 
-  // Create a proper content string from the state
-  const userContent = `
-Description: ${state.description}
-Samples: ${JSON.stringify(state.samples)}
-`;
+DO NOT return explanations.
+DO NOT return regex.
+DO NOT return markdown.
+DO NOT wrap output in code fences.
+Return JSON ONLY.`;
 
-  const res = await model.invoke([
-    { role: "system", content: prompt },
-    { role: "user", content: userContent }
-  ]);
+  const userPrompt = `Description: ${description}
 
-  console.log('res.content:', res.content);
+Samples:
+${samples.map(s => "- " + s).join("\n")}`;
 
-  return {
-    rulesJson: res.content
-  };
-};
+  try {
+    console.log("🔍 Evaluating rules for:", description.substring(0, 50));
+    
+    const response = await gemini.invoke([
+      new SystemMessage(systemPrompt),
+      new HumanMessage(userPrompt)
+    ]);
+
+    // Clean the response before returning
+    const cleanedResponse = cleanJsonResponse(response.content);
+    console.log("✅ Cleaned rules response:", cleanedResponse);
+
+    return {
+      rulesJson: cleanedResponse
+    };
+  } catch (error) {
+    console.error("Error in rule evaluator:", error);
+    return {
+      rulesJson: JSON.stringify({ error: "Rule evaluation failed" })
+    };
+  }
+}

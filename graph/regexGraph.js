@@ -1,17 +1,21 @@
-// regexGraph.js
-const { StateGraph, START, END } = require("@langchain/langgraph");
-const stateDefinition = require("./state");
-const ruleEvaluator = require("./nodes/ruleEvaluator");
-const patternOptimizer = require("./nodes/patternOptimizer");
+// graph/regexGraph.js
+import { StateGraph, START, END } from "@langchain/langgraph";
+import { stateDefinition } from "./state.js";
+import { ruleEvaluator } from "./nodes/ruleEvaluator.js";
+import { patternOptimizer } from "./nodes/patternOptimizer.js";
 
-const graph = new StateGraph(stateDefinition)
+// Create the graph
+const workflow = new StateGraph({
+  channels: stateDefinition
+})
   .addNode("ruleEvaluator", ruleEvaluator)
   .addNode("patternOptimizer", patternOptimizer)
   .addEdge(START, "ruleEvaluator")
   .addEdge("ruleEvaluator", "patternOptimizer")
   .addEdge("patternOptimizer", END);
 
-const compiledGraph = graph.compile();
+// Compile the graph
+const compiledGraph = workflow.compile();
 
-// Export the compiled graph properly
-module.exports = compiledGraph;
+// Export as default
+export default compiledGraph;
