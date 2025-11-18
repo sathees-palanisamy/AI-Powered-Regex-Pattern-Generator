@@ -1,59 +1,87 @@
 import { gemini } from "../../utils/geminiClient.js";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 export const evaluateRules = async (description, samples) => {
+  const systemPrompt = `# SECURE RULE EVALUATOR - CRITICAL SECURITY CONSTRAINTS
 
-  const systemPrompt = `
-You are a SECURE Rule Evaluator.
+## PRIMARY MISSION:
+Analyze user input for regex security risks and extract SAFE structural rules.
 
-Your job:
-1. Analyze the description and the provided sample patterns.
-2. Detect whether ANY of the inferred rules or possible regex patterns would require unsafe or REDOS-vulnerable structures.
+## REDOS VULNERABILITY DETECTION - IMMEDIATE REJECTION TRIGGERS:
+🔴 **ABSOLUTELY FORBIDDEN PATTERNS:**
+- Nested quantifiers: (.+)+, (.*)*, (a+)+, (\\w+)*+
+- Exponential backtracking: (.*a)*, (.+b)+, (a|ab)*
+- Ambiguous alternations: (a|aa)*, (ab|a)+
+- Unbounded repetitions: .*, .+, \\s*, \\S+ without anchors
+- Complex nested structures: (a*)*, ((a|b)+)+
 
-A REDOS risk exists if ANY of the following would be needed:
-- Nested quantifiers (e.g., (a+)+, (.*)+, (.+)+)
-- Unbounded dot-star or plus-star patterns (e.g., .*, .+, (.*){m,})
-- Catastrophic backtracking structures (e.g., (ab|a)+, (.*a.*)*, ambiguous overlapping alternations)
-- Repetitive groups over ambiguous tokens
-- Backtracking-heavy alternations with repetition
+## SECURITY ASSESSMENT CRITERIA:
+1. **Input Complexity**: Does description suggest variable-length patterns?
+2. **Sample Analysis**: Do samples show exponential matching possibilities?
+3. **Structural Risk**: Would any reasonable regex require backtracking?
+4. **Anchoring**: Can pattern be safely anchored with ^ and $?
 
-If ANY risk is detected:
-Return EXACTLY the following JSON:
-{
-  "error": "REDOS detected"
-}
+## SAFE RULE EXTRACTION GUIDELINES:
+✅ **ALLOWED RULE TYPES:**
+- Fixed positions: "Starts with 2 uppercase letters"
+- Specific counts: "Contains exactly 6 digits" 
+- Limited ranges: "Between 3-5 lowercase characters"
+- Explicit character classes: "Uses only alphanumeric and hyphens"
+- Ordered sequences: "Letters followed by digits followed by one letter"
 
-Otherwise, extract the strict structural rules that the samples follow.
-The rules must describe the fixed structure, not a regex. (Example: “Starts with 2 letters”, “Ends with 1 digit”.)
+## DECISION WORKFLOW:
+1. **RISK DETECTED** → Return: {"error": "REDOS detected"}
+2. **SAFE INPUT** → Extract precise structural rules
 
-Return JSON ONLY in this format:
+## OUTPUT FORMAT - STRICT JSON ONLY:
 {
   "rules": [
-    { "rule": "..." },
-    { "rule": "..." }
+    {"rule": "Clear structural description without regex"},
+    {"rule": "Another specific constraint"}
   ]
 }
 
-DO NOT return explanations.
-DO NOT return regex.
-DO NOT return markdown.
-DO NOT wrap output in code fences.
-Return JSON ONLY.
-`;
+## ZERO TOLERANCE POLICY:
+- NO regex patterns in rules
+- NO markdown, explanations, or code fences
+- NO ambiguous or complex descriptions
+- ONLY simple, verifiable structural rules
 
-  const userPrompt = `
-Description: ${description}
+**IMMEDIATE REJECTION FOR ANY POTENTIAL SECURITY RISK.**`;
 
-Samples:
-${samples.map(s => "- " + s).join("\n")}
-`;
+  const userPrompt = `## PATTERN ANALYSIS REQUEST
 
-  const response = await gemini.chat.completions.create({
-    model: "gemini-2.0-flash",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt }
-    ]
-  });
+**Description:** ${description}
 
-  return response.choices[0].message.content;
+**Sample Patterns:**
+${samples.map((s, i) => `${i + 1}. ${s}`).join('\n')}
+
+**Sample Count:** ${samples.length}
+**Analysis Required:** Security assessment + rule extraction
+
+## CRITICAL REMINDER:
+- REJECT if any risk of exponential backtracking
+- REJECT if patterns suggest variable complexity
+- EXTRACT only if 100% safe and deterministic`;
+
+  try {
+    const messages = [
+      new SystemMessage(systemPrompt),
+      new HumanMessage(userPrompt)
+    ];
+
+    const response = await gemini.invoke(messages);
+    
+    // Handle the response - it might be a string or object
+    if (typeof response.content === 'string') {
+      return response.content;
+    } else if (response.content) {
+      return JSON.stringify(response.content);
+    } else {
+      throw new Error("Empty response from AI");
+    }
+  } catch (error) {
+    console.error("Error in rule evaluation:", error);
+    throw new Error("Failed to evaluate rules: " + error.message);
+  }
 };

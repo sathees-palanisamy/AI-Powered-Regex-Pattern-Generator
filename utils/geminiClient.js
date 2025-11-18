@@ -1,6 +1,8 @@
-import OpenAI from "openai";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 
-export const gemini = new OpenAI({
+export const gemini = new ChatGoogleGenerativeAI({
+  model: "gemini-2.0-flash", // Use 'model' instead of 'modelName'
   apiKey: process.env.GEMINI_API_KEY,
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  temperature: 0.1,
+  maxOutputTokens: 1024,
 });
