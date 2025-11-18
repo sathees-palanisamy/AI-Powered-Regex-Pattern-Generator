@@ -1,17 +1,15 @@
 // graph/nodes/ruleEvaluator.js
-import { gemini } from "../../utils/geminiClient.js";
+import { tracedGeminiInvoke } from "../../utils/geminiClient.js";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 // Helper function to clean JSON response
 function cleanJsonResponse(text) {
   if (!text) return text;
   
-  // Remove markdown code blocks
   let cleaned = text.replace(/```json\s*/g, '')
                    .replace(/\s*```/g, '')
                    .trim();
   
-  // Remove any other non-JSON prefixes/suffixes
   cleaned = cleaned.replace(/^[^{[]*/, '')
                    .replace(/[^}\]]*$/, '')
                    .trim();
@@ -52,13 +50,7 @@ Return JSON ONLY in this format:
   ]
 }
 
-IMPORTANT: Return PURE JSON only. No markdown code blocks, no explanations, no additional text.
-
-DO NOT return explanations.
-DO NOT return regex.
-DO NOT return markdown.
-DO NOT wrap output in code fences.
-Return JSON ONLY.`;
+IMPORTANT: Return PURE JSON only. No markdown code blocks, no explanations, no additional text.`;
 
   const userPrompt = `Description: ${description}
 
@@ -68,10 +60,14 @@ ${samples.map(s => "- " + s).join("\n")}`;
   try {
     console.log("🔍 Evaluating rules for:", description.substring(0, 50));
     
-    const response = await gemini.invoke([
+    const response = await tracedGeminiInvoke([
       new SystemMessage(systemPrompt),
       new HumanMessage(userPrompt)
-    ]);
+    ], {
+      step: "rule_evaluation",
+      description_length: description.length,
+      sample_count: samples.length
+    });
 
     // Clean the response before returning
     const cleanedResponse = cleanJsonResponse(response.content);
@@ -87,3 +83,5 @@ ${samples.map(s => "- " + s).join("\n")}`;
     };
   }
 }
+
+export default ruleEvaluator;

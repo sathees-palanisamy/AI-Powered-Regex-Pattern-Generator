@@ -1,12 +1,25 @@
+// server.js - Main server file
 import "dotenv/config";
 import express from "express";
 import compiledGraph from "./graph/regexGraph.js";
+
+// Initialize LangSmith (automatically picks up env vars)
+console.log("🔍 LangSmith Tracing:", process.env.LANGSMITH_TRACING === "true");
 
 const app = express();
 
 app.use(express.json());
 
+// Add request tracing middleware
+app.use((req, res, next) => {
+  console.log(`📥 ${req.method} ${req.path}`);
+  next();
+});
+
 app.post("/generate-pattern", async (req, res) => {
+  // Generate a unique trace ID for this request
+  const traceId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
     const { description, samples } = req.body;
 
@@ -25,22 +38,25 @@ app.post("/generate-pattern", async (req, res) => {
 
     console.log('📥 Received request:', { 
       description: description.substring(0, 100), 
-      sampleCount: samples.length 
+      sampleCount: samples.length,
+      traceId 
     });
 
-    // Use the invoke method on the compiled graph
+    // Use the invoke method on the compiled graph with tracing
     const result = await compiledGraph.invoke({
       description: description || "",
       samples: samples || [],
       rulesJson: "",
       resultJson: ""
+    }, {
+      configurable: {
+        thread_id: traceId,
+      },
     });
 
-    console.log('✅ Graph execution completed');
-    console.log('📊 Rules JSON length:', result.rulesJson?.length);
-    console.log('📊 Result JSON length:', result.resultJson?.length);
+    console.log('✅ Graph execution completed for trace:', traceId);
 
-    // Parse the results using our cleaner
+    // Parse the results
     let rules = [];
     let output = {};
     
@@ -53,7 +69,6 @@ app.post("/generate-pattern", async (req, res) => {
       }
     } catch (e) {
       console.error('❌ Error parsing rulesJson:', e.message);
-      console.log('📝 Raw rulesJson:', result.rulesJson);
     }
     
     try { 
@@ -64,38 +79,41 @@ app.post("/generate-pattern", async (req, res) => {
       }
     } catch (e) {
       console.error('❌ Error parsing resultJson:', e.message);
-      console.log('📝 Raw resultJson:', result.resultJson);
     }
 
     // Check for errors
     if (output.error === "REDOS detected" || (rules && rules.error === "REDOS detected")) {
       return res.status(400).json({ 
         error: "Security risk detected: Pattern complexity could cause performance issues",
-        code: "REDOS_DETECTED"
+        code: "REDOS_DETECTED",
+        traceId
       });
     }
 
     if (!output.pattern) {
       return res.status(500).json({ 
         error: "Failed to generate pattern",
-        details: output.error || "Unknown error during pattern generation"
+        details: output.error || "Unknown error during pattern generation",
+        traceId
       });
     }
 
     res.json({ 
       success: true,
       rules: Array.isArray(rules) ? rules : [],
-      output
+      output,
+      traceId // Include trace ID in response for debugging
     });
 
   } catch (err) {
-    console.error('💥 Server error:', err);
+    console.error('💥 Server error for trace', traceId, ':', err);
     res.status(500).json({ 
       error: "Internal server error",
+      traceId,
       details: process.env.NODE_ENV === 'development' ? err.message : undefined
     });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 API running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 API running on port ${PORT} with LangSmith tracing`));

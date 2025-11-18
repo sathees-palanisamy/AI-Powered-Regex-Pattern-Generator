@@ -19,3 +19,6 @@ const compiledGraph = workflow.compile();
 
 // Export as default
 export default compiledGraph;
+
+// Also export the workflow for debugging
+export { workflow };
