@@ -44,7 +44,7 @@ A full-stack application that generates regex patterns from natural language des
 ```bash
 # Clone the repository
 git clone <your-repo-url>
-cd langgraph-regex-backend
+cd AI-Powered-Regex-Pattern-Generator
 
 # Install backend dependencies
 npm install
