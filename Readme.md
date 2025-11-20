@@ -1,6 +1,6 @@
 # AI Powered Regex Pattern Generator
 
-A full-stack application that generates regex patterns from natural language descriptions and sample patterns using Google's Gemini AI. Built with React (Vite) frontend and Node.js/Express backend with **LangGraph workflow orchestration**.
+A full-stack application that generates regex patterns from natural language descriptions and sample patterns using Google's Gemini AI. Built with React (Vite) frontend and Node.js/Express backend with **LangGraph workflow orchestration**. Also includes an MCP (Model Context Protocol) server for tool integration.
 
 ## 🚀 Features
 
@@ -12,6 +12,8 @@ A full-stack application that generates regex patterns from natural language des
 - **🔍 Rule Extraction** - See the underlying rules extracted from your description
 - **🛡️ Security First** - Built-in REDOS vulnerability detection
 - **📱 Responsive Design** - Works perfectly on desktop and mobile devices
+- **🔧 MCP Server** - Exposes regex generation as a Model Context Protocol tool
+- **📊 LangSmith Monitoring** - Optional tracing and monitoring integration
 
 ## 🛠 Tech Stack
 
@@ -27,6 +29,7 @@ A full-stack application that generates regex patterns from natural language des
 - **LangGraph** - Workflow orchestration and state management
 - **LangChain** - AI integration framework
 - **Zod** - Schema validation
+- **MCP** - Model Context Protocol server
 
 ## 📋 Prerequisites
 
@@ -58,6 +61,8 @@ Create a `.env` file in the backend directory:
 
 ```env
 GEMINI_API_KEY=your_actual_gemini_api_key_here
+# Optional: LangSmith monitoring
+LANGSMITH_API_KEY=your_langsmith_api_key_here
 ```
 
 **To get your Gemini API Key:**
@@ -68,7 +73,7 @@ GEMINI_API_KEY=your_actual_gemini_api_key_here
 
 ### 3. Run the Application
 
-Choose between two backend architectures:
+Choose between multiple backend architectures:
 
 #### Option A: LangGraph Workflow (Recommended)
 ```bash
@@ -82,9 +87,25 @@ npm run graph
 npm run chain
 ```
 
+#### Option C: MCP Server Only
+```bash
+# Start the MCP server directly
+node regexMcpServer.js
+
+# Or with nodemon (if installed)
+nodemon regexMcpServer.js
+```
+
+#### Option D: Agent Flow
+```bash
+# Runs the agent flow (server + client concurrently)
+npm run agent
+```
+
 This will start:
 - **Backend server** on http://localhost:3000
 - **Frontend development server** on http://localhost:3001
+- **MCP server** on stdio (for tool integration)
 
 The application will automatically open in your browser.
 
@@ -98,6 +119,7 @@ The application will automatically open in your browser.
 | `npm run client` | Start frontend development server |
 | `npm run graph` | Start both LangGraph backend and frontend |
 | `npm run chain` | Start both traditional backend and frontend |
+| `npm run agent` | Start agent flow (server + client) |
 
 ### Frontend Scripts (run from `/client` directory)
 | Command | Description |
@@ -108,8 +130,9 @@ The application will automatically open in your browser.
 
 ## 🏗 Architecture
 
-### LangGraph Workflow
-The application features two backend architectures:
+### Backend Architectures
+
+The application features multiple backend architectures:
 
 1. **LangGraph Workflow** (`serverGraph.js`):
    - Stateful workflow orchestration
@@ -122,7 +145,13 @@ The application features two backend architectures:
    - Simple request-response pattern
    - Direct API integration
 
+3. **MCP Server** (`regexMcpServer.js`):
+   - Exposes `generate_regex` tool via Model Context Protocol
+   - Runs on stdio for tool integration
+   - Supports LangSmith monitoring
+
 ### Workflow Steps:
+
 1. **Rule Evaluation** - Analyze input for security risks and extract structural rules
 2. **Security Validation** - Detect and prevent REDOS vulnerabilities
 3. **Pattern Optimization** - Generate safe, efficient regex patterns
@@ -130,23 +159,32 @@ The application features two backend architectures:
 
 ## 🎯 How to Use
 
-### 1. Describe Your Pattern
-Enter a clear description in the text area  
-**Example:** "Match email addresses" or "Validate phone numbers in US format"
+### Web Application
 
-### 2. Provide Sample Patterns
-Add examples that should match your pattern  
-Click "+ Add Another Sample" for multiple examples  
-**Examples for emails:** test@example.com, hello@world.io
+1. **Describe Your Pattern**
+   Enter a clear description in the text area
+   **Example:** "Match email addresses" or "Validate phone numbers in US format"
 
-### 3. Generate Regex Pattern
-Click "Generate Regex Pattern" button  
-Wait for AI processing (typically 5-10 seconds)
+2. **Provide Sample Patterns**
+   Add examples that should match your pattern
+   Click "+ Add Another Sample" for multiple examples
+   **Examples for emails:** test@example.com, hello@world.io
 
-### 4. Test and Validate
-Use the test input box to validate the pattern  
-See immediate feedback with ✅ or ❌ results  
-Review generated rules and explanation
+3. **Generate Regex Pattern**
+   Click "Generate Regex Pattern" button
+   Wait for AI processing (typically 5-10 seconds)
+
+4. **Test and Validate**
+   Use the test input box to validate the pattern
+   See immediate feedback with ✅ or ❌ results
+   Review generated rules and explanation
+
+### MCP Server Tool
+
+The MCP server exposes a `generate_regex` tool with the following schema:
+
+- **description** (string) - Natural language description of the pattern
+- **samples** (array) - Example values (coerced to strings automatically)
 
 ## 📊 Example Usage
 
@@ -158,14 +196,14 @@ Review generated rules and explanation
 - **Regex Pattern:** `^[A-Z]{2}[0-9]{6}[A-Z]$`
 - **Explanation:** Pattern for UK National Insurance number format
 - **Test Cases:** Valid and invalid examples
-- **Extracted Rules:** 
+- **Extracted Rules:**
   - Starts with 2 uppercase letters
   - Followed by 6 digits
   - Ends with 1 uppercase letter
 
 ## 🔧 API Documentation
 
-### POST `/generate-pattern`
+### POST /generate-pattern
 
 Generates regex pattern from description and samples using LangGraph workflow.
 
@@ -205,6 +243,21 @@ Generates regex pattern from description and samples using LangGraph workflow.
 }
 ```
 
+## 🔧 MCP Server Documentation
+
+### generate_regex Tool
+
+The MCP server exposes a `generate_regex` tool that can be integrated with other applications via the Model Context Protocol.
+
+**Input Schema:**
+- `description` (string) - Natural language description
+- `samples` (array) - Example patterns (values are coerced to strings)
+
+**Features:**
+- Automatic type coercion for samples
+- LangSmith monitoring integration (optional)
+- Same security validation as web API
+
 ## 🛡 Security Features
 
 - **REDOS Detection** - Automatic detection of ReDoS vulnerabilities
@@ -212,27 +265,43 @@ Generates regex pattern from description and samples using LangGraph workflow.
 - **Input Validation** - Comprehensive security checks at multiple stages
 - **Error Propagation** - Secure error handling throughout the workflow
 
+## 📊 LangSmith Monitoring (Optional)
+
+Enable tracing and monitoring with LangSmith:
+
+1. Set your LangSmith API key:
+```bash
+export LANGSMITH_API_KEY="your_langsmith_api_key_here"
+```
+
+2. The MCP server includes LangSmith tracer initialization
+3. Traces and monitoring data will be sent to LangSmith for instrumented runs
+
 ## 🐛 Troubleshooting
 
 ### Common Issues & Solutions
 
 | Issue | Solution |
 |-------|----------|
-| "GEMINI_API_KEY not found" | Ensure `.env` file exists with valid API key |
+| "GEMINI_API_KEY not found" | Ensure .env file exists with valid API key |
 | Port 3000 already in use | Run `npx kill-port 3000` or change port |
 | Port 3001 already in use | Run `npx kill-port 3001` or Vite will auto-select |
 | Module not found errors | Run `npm install` in both backend and client |
 | LangGraph compilation errors | Check Node.js version (requires v18+) |
+| Validation errors in MCP server | Ensure samples are passed as strings or rely on automatic coercion |
 
 ### Debug Mode
+
 Check these locations for detailed error information:
 - **Backend Console** - Server logs and API processing
 - **Browser Console** - Frontend errors and network requests
 - **Network Tab** - API call details and responses
+- **MCP Server Logs** - Tool execution and LangSmith traces
 
 ## 🚀 Deployment
 
 ### Frontend Deployment (Vercel/Netlify)
+
 ```bash
 cd client
 npm run build
@@ -240,14 +309,33 @@ npm run build
 ```
 
 ### Backend Deployment (Railway/Render)
+
 1. Set environment variable `GEMINI_API_KEY` in your deployment platform
 2. Deploy the backend directory
 3. Update frontend API calls to point to your deployed backend URL
 
+### MCP Server Deployment
+
+The MCP server is designed to run as a local service via stdio. For production MCP deployments, follow your MCP host's documentation for server integration.
+
 ### Environment Variables for Production
+
 ```env
 GEMINI_API_KEY=your_production_api_key
+LANGSMITH_API_KEY=your_langsmith_api_key_here  # Optional
 NODE_ENV=production
+```
+
+## 📁 Project Structure
+
+```
+├── chain/services/     # Rule extraction & optimization services
+├── utils/             # Utilities including JSON extraction
+├── client/            # React frontend application
+├── regexMcpServer.js  # MCP server entrypoint
+├── serverAgent.js     # Agent server entrypoint
+├── serverChain.js     # Traditional LangChain server
+└── serverGraph.js     # LangGraph workflow server
 ```
 
 ## 🤝 Contributing
@@ -284,6 +372,7 @@ After setup, verify:
 - ✅ API calls to `/generate-pattern` working
 - ✅ Regex generation and testing functional
 - ✅ Security validation detecting unsafe patterns
+- ✅ MCP server starts without errors (if using)
 
 ## 🏆 Architecture Benefits
 
@@ -294,10 +383,15 @@ After setup, verify:
 - **Extensibility** - Easy to add new workflow nodes
 - **Monitoring** - Built-in observability and debugging
 
+**MCP Server Provides:**
+- **Tool Integration** - Expose regex generation to other applications
+- **Standard Protocol** - Use Model Context Protocol for interoperability
+- **Monitoring Ready** - Built-in LangSmith tracing support
+
 Happy pattern generating! 🎉
 
 If you find this project helpful, please give it a ⭐ on GitHub!
 
 ---
 
-*Built with modern AI orchestration using LangGraph for reliable and secure regex pattern generation.*
+*Built with modern AI orchestration using LangGraph for reliable and secure regex pattern generation, with MCP integration for tool interoperability.*
