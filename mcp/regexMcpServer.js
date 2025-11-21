@@ -2,9 +2,9 @@ import "dotenv/config";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { evaluateRules } from "./chain/services/ruleEvaluator.js";
-import { optimizePattern } from "./chain/services/patternOptimizer.js";
-import { extractJson } from "./utils/jsonExtractor.js";
+import { evaluateRules } from "../chain/services/ruleEvaluator.js";
+import { optimizePattern } from "../chain/services/patternOptimizer.js";
+import { extractJson } from "../utils/jsonExtractor.js";
 
 // Create server instance
 const server = new McpServer({

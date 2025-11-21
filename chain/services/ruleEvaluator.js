@@ -1,85 +1,76 @@
-import { gemini } from "../../utils/geminiClient.js";
+import { tracedGeminiInvoke } from "../../utils/geminiClient.js";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
+// Helper function to clean JSON response
+function cleanJsonResponse(text) {
+  if (!text) return text;
+  
+  let cleaned = text.replace(/```json\s*/g, '')
+                   .replace(/\s*```/g, '')
+                   .trim();
+  
+  cleaned = cleaned.replace(/^[^{[]*/, '')
+                   .replace(/[^}\]]*$/, '')
+                   .trim();
+  
+  return cleaned;
+}
+
 export const evaluateRules = async (description, samples) => {
-  const systemPrompt = `# SECURE RULE EVALUATOR - CRITICAL SECURITY CONSTRAINTS
+  const systemPrompt = `You are a SECURE Rule Evaluator.
 
-## PRIMARY MISSION:
-Analyze user input for regex security risks and extract SAFE structural rules.
+Your job:
+1. Analyze the description and the provided sample patterns.
+2. Detect whether ANY of the inferred rules or possible regex patterns would require unsafe or REDOS-vulnerable structures.
 
-## REDOS VULNERABILITY DETECTION - IMMEDIATE REJECTION TRIGGERS:
-🔴 **ABSOLUTELY FORBIDDEN PATTERNS:**
-- Nested quantifiers: (.+)+, (.*)*, (a+)+, (\\w+)*+
-- Exponential backtracking: (.*a)*, (.+b)+, (a|ab)*
-- Ambiguous alternations: (a|aa)*, (ab|a)+
-- Unbounded repetitions: .*, .+, \\s*, \\S+ without anchors
-- Complex nested structures: (a*)*, ((a|b)+)+
+A REDOS risk exists if ANY of the following would be needed:
+- Nested quantifiers (e.g., (a+)+, (.*)+, (.+)+)
+- Unbounded dot-star or plus-star patterns (e.g., .*, .+, (.*){m,})
+- Catastrophic backtracking structures (e.g., (ab|a)+, (.*a.*)*, ambiguous overlapping alternations)
+- Repetitive groups over ambiguous tokens
+- Backtracking-heavy alternations with repetition
 
-## SECURITY ASSESSMENT CRITERIA:
-1. **Input Complexity**: Does description suggest variable-length patterns?
-2. **Sample Analysis**: Do samples show exponential matching possibilities?
-3. **Structural Risk**: Would any reasonable regex require backtracking?
-4. **Anchoring**: Can pattern be safely anchored with ^ and $?
+If ANY risk is detected:
+Return EXACTLY the following JSON:
+{
+  "error": "REDOS detected"
+}
 
-## SAFE RULE EXTRACTION GUIDELINES:
-✅ **ALLOWED RULE TYPES:**
-- Fixed positions: "Starts with 2 uppercase letters"
-- Specific counts: "Contains exactly 6 digits" 
-- Limited ranges: "Between 3-5 lowercase characters"
-- Explicit character classes: "Uses only alphanumeric and hyphens"
-- Ordered sequences: "Letters followed by digits followed by one letter"
+Otherwise, extract the strict structural rules that the samples follow.
+The rules must describe the fixed structure, not a regex. (Example: "Starts with 2 letters", "Ends with 1 digit".)
 
-## DECISION WORKFLOW:
-1. **RISK DETECTED** → Return: {"error": "REDOS detected"}
-2. **SAFE INPUT** → Extract precise structural rules
-
-## OUTPUT FORMAT - STRICT JSON ONLY:
+Return JSON ONLY in this format:
 {
   "rules": [
-    {"rule": "Clear structural description without regex"},
-    {"rule": "Another specific constraint"}
+    { "rule": "..." },
+    { "rule": "..." }
   ]
 }
 
-## ZERO TOLERANCE POLICY:
-- NO regex patterns in rules
-- NO markdown, explanations, or code fences
-- NO ambiguous or complex descriptions
-- ONLY simple, verifiable structural rules
+IMPORTANT: Return PURE JSON only. No markdown code blocks, no explanations, no additional text.`;
 
-**IMMEDIATE REJECTION FOR ANY POTENTIAL SECURITY RISK.**`;
+  const userPrompt = `Description: ${description}
 
-  const userPrompt = `## PATTERN ANALYSIS REQUEST
-
-**Description:** ${description}
-
-**Sample Patterns:**
-${samples.map((s, i) => `${i + 1}. ${s}`).join('\n')}
-
-**Sample Count:** ${samples.length}
-**Analysis Required:** Security assessment + rule extraction
-
-## CRITICAL REMINDER:
-- REJECT if any risk of exponential backtracking
-- REJECT if patterns suggest variable complexity
-- EXTRACT only if 100% safe and deterministic`;
+Samples:
+${samples.map(s => "- " + s).join("\n")}`;
 
   try {
-    const messages = [
+    console.log("🔍 Evaluating rules for:", description.substring(0, 50));
+    
+    const response = await tracedGeminiInvoke([
       new SystemMessage(systemPrompt),
       new HumanMessage(userPrompt)
-    ];
+    ], {
+      step: "rule_evaluation",
+      description_length: description.length,
+      sample_count: samples.length
+    });
 
-    const response = await gemini.invoke(messages);
-    
-    // Handle the response - it might be a string or object
-    if (typeof response.content === 'string') {
-      return response.content;
-    } else if (response.content) {
-      return JSON.stringify(response.content);
-    } else {
-      throw new Error("Empty response from AI");
-    }
+    // Clean the response before returning
+    const cleanedResponse = cleanJsonResponse(response.content);
+    console.log("✅ Cleaned rules response:", cleanedResponse);
+
+    return cleanedResponse;
   } catch (error) {
     console.error("Error in rule evaluation:", error);
     throw new Error("Failed to evaluate rules: " + error.message);

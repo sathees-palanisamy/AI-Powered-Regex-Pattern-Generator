@@ -5,11 +5,11 @@
   "scripts": {
     "serverGraph": "nodemon servergraph.js",
     "serverChain": "nodemon serverChain.js",
-    "serverAgent": "nodemon serverAgent.js",
+    "serverMCP": "nodemon serverMCP.js",
     "client": "cd ./client && npm run dev",
     "graph": "concurrently \"npm run serverGraph\" \"npm run client\"",
     "chain": "concurrently \"npm run serverChain\" \"npm run client\"",
-    "agent": "concurrently \"npm run serverAgent\" \"npm run client\""
+    "mcp": "concurrently \"npm run serverMCP\" \"npm run client\""
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

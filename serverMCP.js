@@ -9,7 +9,7 @@ app.use(express.json());
 // Initialize MCP Client
 const transport = new StdioClientTransport({
   command: "node",
-  args: ["regexMcpServer.js"],
+  args: ["mcp/regexMcpServer.js"],
 });
 
 const client = new Client(
