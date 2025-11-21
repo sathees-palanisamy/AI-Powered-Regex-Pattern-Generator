@@ -61,8 +61,11 @@ Create a `.env` file in the backend directory:
 
 ```env
 GEMINI_API_KEY=your_actual_gemini_api_key_here
+
 # Optional: LangSmith monitoring
-LANGSMITH_API_KEY=your_langsmith_api_key_here
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your_langchain_api_key_here
+LANGCHAIN_PROJECT=default
 ```
 
 **To get your Gemini API Key:**
@@ -87,25 +90,21 @@ npm run graph
 npm run chain
 ```
 
-#### Option C: MCP Server Only
+#### Option C: Full Stack with MCP
 ```bash
-# Start the MCP server directly
-node regexMcpServer.js
-
-# Or with nodemon (if installed)
-nodemon regexMcpServer.js
+# Start frontend and Express server that connects to MCP
+npm run mcp
 ```
 
-#### Option D: Agent Flow
+#### Option D: MCP Server Only (Stdio)
 ```bash
-# Runs the agent flow (server + client concurrently)
-npm run agent
+# Start the MCP server directly (for tool integration)
+node mcp/regexMcpServer.js
 ```
 
 This will start:
 - **Backend server** on http://localhost:3000
 - **Frontend development server** on http://localhost:3001
-- **MCP server** on stdio (for tool integration)
 
 The application will automatically open in your browser.
 
@@ -116,10 +115,11 @@ The application will automatically open in your browser.
 |---------|-------------|
 | `npm run serverGraph` | Start LangGraph development server with nodemon |
 | `npm run serverChain` | Start traditional LangChain development server |
+| `npm run serverMCP` | Start Express server that uses MCP client |
 | `npm run client` | Start frontend development server |
 | `npm run graph` | Start both LangGraph backend and frontend |
 | `npm run chain` | Start both traditional backend and frontend |
-| `npm run agent` | Start agent flow (server + client) |
+| `npm run mcp` | Start both MCP-backed server and frontend |
 
 ### Frontend Scripts (run from `/client` directory)
 | Command | Description |
@@ -136,19 +136,19 @@ The application features multiple backend architectures:
 
 1. **LangGraph Workflow** (`serverGraph.js`):
    - Stateful workflow orchestration
+   - Logic encapsulated in `graph/regexGraph.js`
    - Sequential rule evaluation and pattern optimization
    - Built-in error handling and validation
-   - Graph-based execution with Zod schema validation
 
 2. **Traditional LangChain** (`serverChain.js`):
    - Linear chain execution
    - Simple request-response pattern
    - Direct API integration
 
-3. **MCP Server** (`regexMcpServer.js`):
-   - Exposes `generate_regex` tool via Model Context Protocol
-   - Runs on stdio for tool integration
-   - Supports LangSmith monitoring
+3. **MCP Architecture** (`serverMCP.js` + `mcp/regexMcpServer.js`):
+   - `serverMCP.js`: Express server acting as an MCP Client
+   - `mcp/regexMcpServer.js`: The actual MCP Server exposing `generate_regex` tool
+   - Communication via Stdio transport
 
 ### Workflow Steps:
 
@@ -269,9 +269,11 @@ The MCP server exposes a `generate_regex` tool that can be integrated with other
 
 Enable tracing and monitoring with LangSmith:
 
-1. Set your LangSmith API key:
+1. Set your LangSmith API keys in `.env`:
 ```bash
-export LANGSMITH_API_KEY="your_langsmith_api_key_here"
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY="your_langchain_api_key_here"
+LANGCHAIN_PROJECT="default"
 ```
 
 2. The MCP server includes LangSmith tracer initialization
@@ -322,7 +324,8 @@ The MCP server is designed to run as a local service via stdio. For production M
 
 ```env
 GEMINI_API_KEY=your_production_api_key
-LANGSMITH_API_KEY=your_langsmith_api_key_here  # Optional
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=your_langchain_api_key
 NODE_ENV=production
 ```
 
@@ -332,8 +335,12 @@ NODE_ENV=production
 ├── chain/services/     # Rule extraction & optimization services
 ├── utils/             # Utilities including JSON extraction
 ├── client/            # React frontend application
-├── regexMcpServer.js  # MCP server entrypoint
-├── serverAgent.js     # Agent server entrypoint
+├── mcp/
+│   └── regexMcpServer.js # MCP server entrypoint
+├── graph/
+│   ├── regexGraph.js  # Graph definition and node logic
+│   └── state.js       # Graph state schema
+├── serverMCP.js       # Express server wrapping MCP client
 ├── serverChain.js     # Traditional LangChain server
 └── serverGraph.js     # LangGraph workflow server
 ```
